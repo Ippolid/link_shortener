@@ -1,12 +1,9 @@
 package service
 
-import (
-	"crypto/sha1"
-	"encoding/hex"
-)
+import "service/internal/database"
 
-func GenerateShortURL(url string) string {
-	hash := sha1.New()
-	hash.Write([]byte(url))
-	return hex.EncodeToString(hash.Sum(nil))[:8]
+func CreateLink(userid int64, link string, r *database.Storage) error {
+	p := NewLink(link)
+	r.AppendElem(userid, link, p, 0)
+	return nil
 }
