@@ -3,17 +3,19 @@ package service
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"strconv"
 )
 
 const domen string = "http://loclahost:8090/"
 
-func GenerateShortURL(url string) string {
+func GenerateShortURL(userid int, url string) string {
 	hash := sha1.New()
-	hash.Write([]byte(url))
+	url1 := url + strconv.Itoa(userid)
+	hash.Write([]byte(url1))
 	return hex.EncodeToString(hash.Sum(nil))[:8]
 }
 
-func NewLink(oldlink string) string {
-	indeficator := GenerateShortURL(oldlink)
+func NewLink(userId int, oldlink string) string {
+	indeficator := GenerateShortURL(userId, oldlink)
 	return domen + indeficator
 }

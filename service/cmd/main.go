@@ -2,42 +2,45 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
-	"time"
+	"service/internal/database"
+	"service/internal/service"
 
 	_ "github.com/lib/pq"
 )
 
-const (
-	queryCreateUsersTable = `CREATE TABLE IF NOT EXISTS users (
-		id bigserial PRIMARY KEY,
-		name text NOT NULL,
-		password text NOT NULL
-	)`
-
-	queryGetUser    = `SELECT * FROM users WHERE id = $1`
-	queryCreateUser = `INSERT INTO users (name, password) VALUES ($1, $2) RETURNING id`
-)
-
 func main() {
-	// sk, _ := database.NewStorage()
-	// service.CreateLink(1, "https://habr.com/ru/companies/inDrive/articles/690088/", &sk)
-	// fmt.Println(sk)
-	postgresURI := "postgres://postgres:password@localhost:5432"
+	postgresURI := "postgres://postgres:1234@localhost:5432"
 	db, err := sql.Open("postgres", postgresURI)
 	if err != nil {
 		log.Fatal("open", err)
 	}
 
+	datab, err := database.NewDataBase(db)
+	if err != nil {
+		log.Fatal("open", err)
+	}
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
 		log.Fatal("ping", err)
 	}
 
-	_, err = db.Exec(queryCreateUsersTable)
-	if err != nil {
-		log.Fatal(err)
-	}
-	time.Sleep(1000 * time.Second)
+	datab.InsertLink(2, "https://vk.com/audios301631204", service.NewLink(2, "https://vk.com/audios301631204"))
+	datab.InsertLink(2, "https://vk.com/audios3016312041", service.NewLink(2, "https://vk.com/audios301631204111111"))
+	datab.InsertLink(3, "https://vk.com/audios3016312041", service.NewLink(3, "https://vk.com/audios3016312041"))
+	datab.InsertLink(3, "https://vk.com/audios3016312041", service.NewLink(3, "https://vk.com/audios301631204"))
+	datab.InsertLink(2, "https://vk.com/audios30162041", service.NewLink(2, "https://vk.com/audios30163204"))
+
+	datab.DeleteLink(2, service.NewLink(2, "https://vk.com/audios301631204111111"))
+
+	datab.EditExpiretime(3, service.NewLink(3, "https://vk.com/audios301631204"), 24)
+
+	p, _ := datab.GetUserBylink(service.NewLink(2, "https://vk.com/audios30163204"))
+	fmt.Println(p)
+
+	k, _ := datab.GetUseridslinks(2)
+	fmt.Println(k)
+
 }
