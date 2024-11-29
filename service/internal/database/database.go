@@ -55,11 +55,14 @@ const (
 )
 
 func (base *DataBase) InsertLink(userId int, oldLink, shortLink string) error {
-	expireTime := time.Now().Add(time.Hour * 744)
-	_, err := base.db.Exec(queryInsertLink, userId, oldLink, shortLink, expireTime)
+	expireTime := int((time.Now().Add(time.Hour * 744)).Unix())
+	k, err := base.db.Exec(queryInsertLink, userId, oldLink, shortLink, expireTime)
 	if err != nil {
+		fmt.Println(err)
 		return fmt.Errorf("error executing query: %v", err)
 	}
+
+	fmt.Println(k)
 	return nil
 }
 
@@ -120,7 +123,7 @@ func (base *DataBase) EditExpiretime(userId int, shortlink string, hours int) er
 		return fmt.Errorf("error for geting owner of links: %s", shortlink)
 	}
 	if linkowner == userId {
-		expireTime := time.Now().Add(time.Hour * time.Duration(hours))
+		expireTime := int((time.Now().Add(time.Hour * time.Duration(hours))).Unix())
 		_, err := base.db.Exec(queryEditExpire, expireTime, shortlink)
 		if err != nil {
 			return fmt.Errorf("error updating expireTime: %v", err)
