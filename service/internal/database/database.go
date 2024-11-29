@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -12,8 +13,12 @@ type DataBase struct {
 }
 
 // NewDBWrapper — конструктор для обёртки
-func NewDataBase(db *sql.DB) *DataBase {
-	return &DataBase{db: db}
+func NewDataBase(db *sql.DB) (*DataBase, error) {
+	_, err := db.Exec(queryCreateLinksTable)
+	if err != nil {
+		return nil, err
+	}
+	return &DataBase{db: db}, nil
 }
 
 const (
@@ -22,23 +27,36 @@ const (
 		userId integer NOT NULL,
 		oldLink text NOT NULL,
 		shortLink text NOT NULL UNIQUE,
-		expireTime integer NOT NULL
+		expireTime integer NOT NULL,
+		transfercounter integer NOT NULL
 	)`
 
 	queryInsertLink = `
-		INSERT INTO links1 (userId, oldLink, shortLink, expireTime)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO links (userId, oldLink, shortLink, expireTime,transfercounter)
+		VALUES ($1, $2, $3, $4,0)
 		ON CONFLICT (shortLink) DO NOTHING;`
 
 	queryGetLinks = `SELECT shortLink FROM links WHERE userId = $1;`
 
+	queryDelete = `
+		DELETE FROM links
+		WHERE shortLink = $1;
+	`
+	queryGetUser = `SELECT userId
+		FROM links
+		WHERE shortLink = $1;`
+
+	queryEditExpire = `
+		UPDATE links
+		SET expireTime = $1
+		WHERE shortLink = $2;
+	`
 	postgresURI = "postgres://postgres:password@localhost:5432"
 )
 
-func (base *DataBase) InsertLink(userId int, oldLink, shortLink string, expireTime int) error {
-
+func (base *DataBase) InsertLink(userId int, oldLink, shortLink string) error {
+	expireTime := time.Now().Add(time.Hour * 744)
 	_, err := base.db.Exec(queryInsertLink, userId, oldLink, shortLink, expireTime)
-
 	if err != nil {
 		return fmt.Errorf("error executing query: %v", err)
 	}
@@ -67,4 +85,46 @@ func (base *DataBase) GetUseridslinks(userId int) ([]string, error) {
 	}
 
 	return shortLinks, nil
+}
+
+func (base *DataBase) GetUserBylink(shortlink string) (int, error) {
+	var userId int
+
+	err := base.db.QueryRow(queryGetUser, shortlink).Scan(&userId)
+	if err == sql.ErrNoRows {
+		return 0, fmt.Errorf("no user found for shortLink: %s", shortlink)
+	} else if err != nil {
+		return 0, fmt.Errorf("error executing query: %v", err)
+	}
+
+	return userId, nil
+}
+
+func (base *DataBase) DeleteLink(userId int, shortlink string) error {
+	linkowner, err := base.GetUserBylink(shortlink)
+	if err != nil {
+		return fmt.Errorf("error for geting owner of links: %s", shortlink)
+	}
+	if linkowner == userId {
+		_, err := base.db.Exec(queryDelete, shortlink)
+		if err != nil {
+			return fmt.Errorf("error deleting by shortLink: %v", err)
+		}
+	}
+	return nil
+}
+
+func (base *DataBase) EditExpiretime(userId int, shortlink string, hours int) error {
+	linkowner, err := base.GetUserBylink(shortlink)
+	if err != nil {
+		return fmt.Errorf("error for geting owner of links: %s", shortlink)
+	}
+	if linkowner == userId {
+		expireTime := time.Now().Add(time.Hour * time.Duration(hours))
+		_, err := base.db.Exec(queryEditExpire, expireTime, shortlink)
+		if err != nil {
+			return fmt.Errorf("error updating expireTime: %v", err)
+		}
+	}
+	return nil
 }
