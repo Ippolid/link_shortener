@@ -6,7 +6,7 @@ import (
 	"strconv"
 )
 
-const domen string = "http://loclahost:8090/"
+const domen string = "http://localhost:8090/"
 
 func GenerateShortURL(userid int, url string) string {
 	hash := sha1.New()
