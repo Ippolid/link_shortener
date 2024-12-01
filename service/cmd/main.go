@@ -30,12 +30,16 @@ func main() {
 	datab.InsertLink(2, "https://vk.com/audios301631204", service.NewLink(2, "https://vk.com/audios301631204"))
 	datab.InsertLink(2, "https://vk.com/audios3016312041", service.NewLink(2, "https://vk.com/audios301631204111111"))
 	datab.InsertLink(3, "https://vk.com/audios3016312041", service.NewLink(3, "https://vk.com/audios3016312041"))
-	datab.InsertLink(3, "https://vk.com/audios3016312041", service.NewLink(3, "https://vk.com/audios301631204"))
+	datab.InsertLink(3, "https://vk.com/audios3016312041", service.NewLink(3, "https://vk.com/audios3016312041"))
 	datab.InsertLink(2, "https://vk.com/audios30162041", service.NewLink(2, "https://vk.com/audios30163204"))
 
 	datab.DeleteLink(2, service.NewLink(2, "https://vk.com/audios301631204111111"))
 
 	datab.EditExpiretime(3, service.NewLink(3, "https://vk.com/audios301631204"), 24)
+
+	z, _ := datab.GetLinkbyShortlink(service.NewLink(3, "https://vk.com/audios301631204"))
+
+	fmt.Println(z)
 
 	p, _ := datab.GetUserBylink(service.NewLink(2, "https://vk.com/audios30163204"))
 	fmt.Println(p)

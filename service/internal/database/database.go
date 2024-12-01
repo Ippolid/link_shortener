@@ -52,17 +52,17 @@ const (
 		WHERE shortLink = $2;
 	`
 	postgresURI = "postgres://postgres:password@localhost:5432"
+
+	queryGetLinkbyShort = `SELECT oldLink FROM links WHERE shortLink = $1;`
 )
 
 func (base *DataBase) InsertLink(userId int, oldLink, shortLink string) error {
 	expireTime := int((time.Now().Add(time.Hour * 744)).Unix())
-	k, err := base.db.Exec(queryInsertLink, userId, oldLink, shortLink, expireTime)
+	_, err := base.db.Exec(queryInsertLink, userId, oldLink, shortLink, expireTime)
 	if err != nil {
-		fmt.Println(err)
 		return fmt.Errorf("error executing query: %v", err)
 	}
 
-	fmt.Println(k)
 	return nil
 }
 
@@ -130,4 +130,17 @@ func (base *DataBase) EditExpiretime(userId int, shortlink string, hours int) er
 		}
 	}
 	return nil
+}
+
+func (base *DataBase) GetLinkbyShortlink(shortLink string) (string, error) {
+	var oldLink string
+
+	err := base.db.QueryRow(queryGetLinkbyShort, shortLink).Scan(&oldLink)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("no oldLink found for shortLink: %s", shortLink)
+	} else if err != nil {
+		return "", fmt.Errorf("error executing query: %v", err)
+	}
+
+	return oldLink, nil
 }
