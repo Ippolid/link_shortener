@@ -53,7 +53,12 @@ const (
 	`
 	postgresURI = "postgres://postgres:password@localhost:5432"
 
-	queryGetLinkbyShort = `SELECT oldLink FROM links WHERE shortLink = $1;`
+	queryGetLinkbyShort  = `SELECT oldLink FROM links WHERE shortLink = $1;`
+	queryTransfercounter = `
+		UPDATE links
+		SET transfercounter = transfercounter + 1
+		WHERE shortLink = $1;
+	`
 
 	queryGetStatic = `SELECT expireTime, transfercounter FROM links WHERE shortLink = $1;`
 )
@@ -143,8 +148,16 @@ func (base *DataBase) GetLinkbyShortlink(shortLink string) (string, error) {
 	} else if err != nil {
 		return "", fmt.Errorf("error executing query: %v", err)
 	}
-
+	go base.EditTransferCount(shortLink)
 	return oldLink, nil
+}
+
+func (base *DataBase) EditTransferCount(shortLink string) error {
+	_, err := base.db.Exec(queryTransfercounter, shortLink)
+	if err != nil {
+		return fmt.Errorf("error updating transfercounter: %w", err)
+	}
+	return nil
 }
 
 func (base *DataBase) GetLinkStatic(userId int, shortLink string) (int, int, error) {
