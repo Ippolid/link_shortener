@@ -54,6 +54,8 @@ const (
 	postgresURI = "postgres://postgres:password@localhost:5432"
 
 	queryGetLinkbyShort = `SELECT oldLink FROM links WHERE shortLink = $1;`
+
+	queryGetStatic = `SELECT expireTime, transfercounter FROM links WHERE shortLink = $1;`
 )
 
 func (base *DataBase) InsertLink(userId int, oldLink, shortLink string) error {
@@ -143,4 +145,24 @@ func (base *DataBase) GetLinkbyShortlink(shortLink string) (string, error) {
 	}
 
 	return oldLink, nil
+}
+
+func (base *DataBase) GetLinkStatic(userId int, shortLink string) (int, int, error) {
+	var expireTime int
+	var transferCounter int
+
+	linkowner, err := base.GetUserBylink(shortLink)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error for geting owner of links: %s", shortLink)
+	}
+	if linkowner == userId {
+		err := base.db.QueryRow(queryGetStatic, shortLink).Scan(&expireTime, &transferCounter)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return 0, 0, fmt.Errorf("no record found for shortLink: %s", shortLink)
+			}
+			return 0, 0, err
+		}
+	}
+	return expireTime, transferCounter, nil
 }
