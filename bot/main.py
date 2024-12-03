@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+import os
 import logging
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import (
@@ -8,12 +10,12 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-
+load_dotenv()  # take environment variables from .env.
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-
+TOKEN = os.getenv('TOKEN')
 START_CHOICES, REPLY_FOR_CREATE, URL_CHOICES, REPLY_FOR_DELETE, \
 REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD = range(7)
 
@@ -150,9 +152,6 @@ async def to_main_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         reply_markup=start_markups,
     )
     return START_CHOICES
-
-
-TOKEN = ''
 
 
 def main() -> None:
