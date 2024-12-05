@@ -3,7 +3,10 @@ package service
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
+	"service/internal/database"
 	"strconv"
+	"time"
 )
 
 const domen string = "http://localhost:8090/"
@@ -18,4 +21,19 @@ func GenerateShortURL(userid int, url string) string {
 func NewLink(userId int, oldlink string) string {
 	indeficator := GenerateShortURL(userId, oldlink)
 	return domen + indeficator
+}
+
+func DeleteOverdueLines(closeChan chan struct{}, n time.Duration, database *database.DataBase) {
+	for {
+		select {
+		case <-closeChan:
+			return
+		case <-time.After(n):
+			timenow := int(time.Now().Unix())
+			err := database.DeleteBytime(timenow)
+			if err != nil {
+				fmt.Printf("ERR0R %v", err)
+			}
+		}
+	}
 }

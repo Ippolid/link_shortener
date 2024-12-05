@@ -61,6 +61,8 @@ const (
 	`
 
 	queryGetStatic = `SELECT expireTime, transfercounter FROM links WHERE shortLink = $1;`
+
+	queryDeleteBytime = `DELETE FROM links WHERE expireTime < $1;`
 )
 
 func (base *DataBase) InsertLink(userId int, oldLink, shortLink string) error {
@@ -148,6 +150,7 @@ func (base *DataBase) GetLinkbyShortlink(shortLink string) (string, error) {
 	} else if err != nil {
 		return "", fmt.Errorf("error executing query: %v", err)
 	}
+	//transfercount +1 when user use redirect
 	go base.EditTransferCount(shortLink)
 	return oldLink, nil
 }
@@ -178,4 +181,13 @@ func (base *DataBase) GetLinkStatic(userId int, shortLink string) (int, int, err
 		}
 	}
 	return expireTime, transferCounter, nil
+}
+
+func (base *DataBase) DeleteBytime(time int) error {
+	_, err := base.db.Exec(queryDeleteBytime, time)
+
+	if err != nil {
+		return fmt.Errorf("ошибка выполнения запроса DELETE: %w", err)
+	}
+	return nil
 }
