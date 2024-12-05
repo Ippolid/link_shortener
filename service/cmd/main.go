@@ -5,6 +5,8 @@ import (
 	"log"
 	"service/internal/database"
 	"service/internal/server"
+	"service/internal/service"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -51,7 +53,11 @@ func main() {
 	// datab.GetLinkbyShortlink("0b95c551")
 	// fmt.Println(k)
 	// fmt.Println(err)
+	closeChan := make(chan struct{})
+	time := time.Hour * 1
+	go service.DeleteOverdueLines(closeChan, time, datab)
 	server := server.New(":8090", datab)
 	server.Start()
+	close(closeChan)
 
 }
