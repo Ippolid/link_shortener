@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"os"
 	"service/internal/database"
 	"service/internal/server"
 	"service/internal/service"
@@ -12,7 +13,7 @@ import (
 )
 
 func main() {
-	postgresURI := "postgres://postgres:1234@localhost:5432"
+	postgresURI := os.Getenv("POSTGRES")
 	db, err := sql.Open("postgres", postgresURI)
 	if err != nil {
 		log.Fatal("open", err)
@@ -56,8 +57,11 @@ func main() {
 	closeChan := make(chan struct{})
 	time := time.Hour * 1
 	go service.DeleteOverdueLines(closeChan, time, datab)
-	server := server.New(":8090", datab)
+
+	host := os.Getenv("HOST")
+	server := server.New(host, datab)
 	server.Start()
+
 	close(closeChan)
 
 }
