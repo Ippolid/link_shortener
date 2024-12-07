@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import os
+import json
 import logging
 from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
@@ -10,6 +11,7 @@ from telegram.ext import (
     MessageHandler,
     filters, CallbackQueryHandler,
 )
+import httpx
 
 load_dotenv()  # take environment variables from .env.
 logging.basicConfig(
@@ -57,6 +59,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Уважаемый пользователь, Вас приветствует бот по созданию коротких ссылок! Выберите один из вариантов",
         reply_markup=start_keyboard,
     )
+    print(update.effective_user.id)
 
     return START_CHOICES
 
@@ -69,10 +72,24 @@ async def create_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    response = 'https://google.com'
+    user_id = update.effective_user.id
+    response = httpx.post(
+        f"http://team5.itatmisis.ru/url",
+        json={
+            "oldurl": update.message.text,
+            "userid": str(user_id),
+        }
+    )
+    if response.status_code != 200:
+        await update.message.reply_text(
+            f"Не удалось создать ссылку. Подробности {response.text}",
+            reply_markup=start_keyboard,
+        )
+        return START_CHOICES
 
+    short_url = response.json()["shorturl"]
     await update.message.reply_markdown(
-        f"Ваша ссылка ```{response}```",
+        f"Ваша ссылка ```{short_url}```",
         reply_markup=start_keyboard,
     )
 
@@ -80,7 +97,10 @@ async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    response = ['http_1', 'http_2']
+    user_id = 89898
+    response = httpx.get(
+        f"http://team5.itatmisis.ru/statistic/{user_id}"
+    )
     user_data = context.user_data
     if not user_data.get('urls'):
         user_data['urls'] = response
