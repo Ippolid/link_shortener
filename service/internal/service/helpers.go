@@ -4,12 +4,11 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"service/internal/database"
 	"strconv"
 	"time"
 )
-
-const domen string = "http://localhost:8090/"
 
 func GenerateShortURL(userid int, url string) string {
 	hash := sha1.New()
@@ -19,6 +18,7 @@ func GenerateShortURL(userid int, url string) string {
 }
 
 func NewLink(userId int, oldlink string) string {
+	domen := os.Getenv("DOMEN")
 	indeficator := GenerateShortURL(userId, oldlink)
 	return domen + indeficator
 }
