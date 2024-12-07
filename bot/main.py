@@ -9,7 +9,7 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
     MessageHandler,
-    filters, CallbackQueryHandler,
+    filters, CallbackQueryHandler, CallbackContext,
 )
 import httpx
 
@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 TOKEN = os.getenv('TOKEN')
 START_CHOICES, REPLY_FOR_CREATE, URL_CHOICES, REPLY_FOR_DELETE, \
-REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD = range(7)
+REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD, URL_EVENTS = range(8)
 
 create_url_btn = 'создать ссылку'
 list_of_urls_btn = "список ссылок"
@@ -97,10 +97,22 @@ async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = 89898
-    response = httpx.get(
-        f"http://team5.itatmisis.ru/statistic/{user_id}"
-    )
+    # user_id = 89898
+    # response = httpx.get(
+    #     f"http://team5.itatmisis.ru/statistic/{user_id}"
+    # )
+    response = [
+        {"url": "https://sdfsd", "stat": 12, "expired": 20},
+        {"url": "https://tweter", "stat": 10, "expired": 5}
+    ]
+    button_list = []
+    for each in response:
+        url = each["url"]
+        button_list.append(InlineKeyboardButton(url, callback_data=f"url_is_{url}"))
+    urls_keyboard_dynamic = InlineKeyboardMarkup(
+        [button_list[i:i + 1] for i in range(0, len(button_list), 1)]
+    )  # 1 is for single column and mutliple rows
+
     user_data = context.user_data
     if not user_data.get('urls'):
         user_data['urls'] = response
@@ -110,7 +122,7 @@ async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         urls_str += f"\n{i + 1} {urls[i]}"
     await update.callback_query.edit_message_text(
         f"список ссылок {urls_str}",
-        reply_markup=urls_keyboard,
+        reply_markup=urls_keyboard_dynamic,
     )
     return URL_CHOICES
 
@@ -187,6 +199,16 @@ async def to_main_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return START_CHOICES
 
 
+async def url_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await update.callback_query.edit_message_text(
+        f"Ваша ссылка {query.data}",
+        reply_markup=urls_keyboard,
+    )
+
+    return URL_EVENTS
+
+
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
 
@@ -204,6 +226,9 @@ def main() -> None:
                 ),
             ],
             URL_CHOICES: [
+                CallbackQueryHandler(url_edit, pattern="^url_is"),
+            ],
+            URL_EVENTS: [
                 CallbackQueryHandler(delete_url_ask, pattern="^" + str(REPLY_FOR_DELETE) + "$"),
                 CallbackQueryHandler(change_url_ask, pattern="^" + str(REPLY_FOR_CHANGE) + "$"),
             ],
