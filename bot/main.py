@@ -1,14 +1,14 @@
 from dotenv import load_dotenv
 import os
 import logging
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application,
     CommandHandler,
     ContextTypes,
     ConversationHandler,
     MessageHandler,
-    filters,
+    filters, CallbackQueryHandler,
 )
 load_dotenv()  # take environment variables from .env.
 logging.basicConfig(
@@ -20,7 +20,6 @@ START_CHOICES, REPLY_FOR_CREATE, URL_CHOICES, REPLY_FOR_DELETE, \
 REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD = range(7)
 
 create_url_btn = 'создать ссылку'
-to_main_page_btn = 'на главную'
 list_of_urls_btn = "список ссылок"
 
 start_markups_keyboard = [
@@ -41,29 +40,37 @@ urls_markups_keyboard = [
 urls_markups = ReplyKeyboardMarkup(urls_markups_keyboard, one_time_keyboard=True)
 
 
+start_buttons = [
+        [
+            InlineKeyboardButton(text=create_url_btn, callback_data=str(REPLY_FOR_CREATE)),
+            InlineKeyboardButton(text=list_of_urls_btn, callback_data=str(URL_CHOICES)),
+        ],
+    ]
+start_keyboard = InlineKeyboardMarkup(start_buttons)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "старт",
-        reply_markup=start_markups,
+        "Выберите один из вариантов",
+        reply_markup=start_keyboard,
     )
 
     return START_CHOICES
 
 
 async def create_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    text = update.message.text
-    context.user_data["choice"] = text
-    await update.message.reply_text(f"введите ссылку")
-
+    await update.effective_message.edit_text(
+        "Введите свою ссылку",
+    )
     return REPLY_FOR_CREATE
 
 
 async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    response = 'http'
+    response = 'https://google.com'
 
-    await update.message.reply_text(
-        f"ваша ссылка {response}",
-        reply_markup=start_markups,
+    await update.message.reply_markdown(
+        f"Ваша ссылка ```{response}```",
+        reply_markup=start_keyboard,
     )
 
     return START_CHOICES
@@ -126,14 +133,6 @@ async def change_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     return REPLY_FOR_CHANGE_PERIOD
 
-#
-# async def change_url_period_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-#     # text = update.message.text
-#     # context.user_data["choice"] = text
-#     await update.message.reply_text(f"введите желаемый срок действия")
-#
-#     return REPLY_FOR_CHANGE_PERIOD
-
 
 async def change_url_period_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     response = '200_OK'
@@ -161,9 +160,7 @@ def main() -> None:
         entry_points=[CommandHandler("start", start)],
         states={
             START_CHOICES: [
-                MessageHandler(
-                    filters.Regex(f"^({create_url_btn})$"), create_url_ask
-                ),
+                CallbackQueryHandler(create_url_ask, pattern="^" + str(REPLY_FOR_CREATE) + "$"),
                 MessageHandler(
                     filters.Regex(f"^({list_of_urls_btn})$"), list_of_urls
                 ),
