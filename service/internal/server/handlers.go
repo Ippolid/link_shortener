@@ -103,7 +103,7 @@ func (s *Server) GetLinks(ctx *gin.Context) {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-
+	links := map[string]string{}
 	links, err1 := s.database.GetUseridslinks(user)
 	if err1 != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, err1.Error())
@@ -123,7 +123,7 @@ func (s *Server) GetLinkStatistic(ctx *gin.Context) {
 	}
 	shortlink := ctx.Param("shorturl")
 
-	times, transfers, err1 := s.database.GetLinkStatic(user, shortlink)
+	times, transfers, origlink, err1 := s.database.GetLinkStatic(user, shortlink)
 	if err1 != nil {
 		ctx.AbortWithStatusJSON(http.StatusInternalServerError, err1.Error())
 		return
@@ -134,6 +134,7 @@ func (s *Server) GetLinkStatistic(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, ResponseLinkStatistic{
 		ExpireTime:    time1,
 		TransferCount: transfers,
+		OrigLink:      origlink,
 	})
 }
 

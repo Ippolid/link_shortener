@@ -20,8 +20,9 @@ services:
     environment:
       POSTGRES: "postgres://postgres:1234@postgres:5432?sslmode=disable"
       HOST: 0.0.0.0:8090
-      DOMEN: "http://localhost/" 
-      #"http://team5.itatmisis.ru/"
+      DOMEN: "http://team5.itatmisis.ru/" 
+      #"http://team5.itatmisis.ru/"   
+      # "http://localhost/" 
     ports:
       - '80:8090'
 volumes:

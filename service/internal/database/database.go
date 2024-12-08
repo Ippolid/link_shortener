@@ -36,7 +36,7 @@ const (
 		VALUES ($1, $2, $3, $4,0)
 		ON CONFLICT (shortLink) DO NOTHING;`
 
-	queryGetLinks = `SELECT shortLink FROM links WHERE userId = $1;`
+	queryGetLinks = `SELECT shortLink, oldLink FROM links WHERE userId = $1`
 
 	queryDelete = `
 		DELETE FROM links
@@ -51,7 +51,6 @@ const (
 		SET expireTime = $1
 		WHERE shortLink = $2;
 	`
-	postgresURI = "postgres://postgres:password@localhost:5432"
 
 	queryGetLinkbyShort  = `SELECT oldLink FROM links WHERE shortLink = $1;`
 	queryTransfercounter = `
@@ -60,7 +59,7 @@ const (
 		WHERE shortLink = $1;
 	`
 
-	queryGetStatic = `SELECT expireTime, transfercounter FROM links WHERE shortLink = $1;`
+	queryGetStatic = `SELECT expireTime, transfercounter,oldLink FROM links WHERE shortLink = $1;`
 
 	queryDeleteBytime = `DELETE FROM links WHERE expireTime < $1;`
 )
@@ -75,7 +74,7 @@ func (base *DataBase) InsertLink(userId int, oldLink, shortLink string) error {
 	return nil
 }
 
-func (base *DataBase) GetUseridslinks(userId int) ([]string, error) {
+func (base *DataBase) GetUseridslinks(userId int) (map[string]string, error) {
 
 	rows, err := base.db.Query(queryGetLinks, userId)
 	if err != nil {
@@ -83,20 +82,20 @@ func (base *DataBase) GetUseridslinks(userId int) ([]string, error) {
 	}
 	defer rows.Close()
 
-	var shortLinks []string
+	links := make(map[string]string)
 	for rows.Next() {
-		var shortLink string
-		if err := rows.Scan(&shortLink); err != nil {
-			return nil, fmt.Errorf("error scanning row: %v", err)
+		var shortLink, oldLink string
+		if err := rows.Scan(&shortLink, &oldLink); err != nil {
+			return nil, err
 		}
-		shortLinks = append(shortLinks, shortLink)
+		links[shortLink] = oldLink
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error with rows: %v", err)
+		return nil, err
 	}
 
-	return shortLinks, nil
+	return links, nil
 }
 
 func (base *DataBase) GetUserBylink(shortlink string) (int, error) {
@@ -163,24 +162,25 @@ func (base *DataBase) EditTransferCount(shortLink string) error {
 	return nil
 }
 
-func (base *DataBase) GetLinkStatic(userId int, shortLink string) (int, int, error) {
+func (base *DataBase) GetLinkStatic(userId int, shortLink string) (int, int, string, error) {
 	var expireTime int
 	var transferCounter int
+	var origlink string
 
 	linkowner, err := base.GetUserBylink(shortLink)
 	if err != nil {
-		return 0, 0, fmt.Errorf("error for geting owner of links: %s", shortLink)
+		return 0, 0, "", fmt.Errorf("error for geting owner of links: %s", shortLink)
 	}
 	if linkowner == userId {
-		err := base.db.QueryRow(queryGetStatic, shortLink).Scan(&expireTime, &transferCounter)
+		err := base.db.QueryRow(queryGetStatic, shortLink).Scan(&expireTime, &transferCounter, &origlink)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				return 0, 0, fmt.Errorf("no record found for shortLink: %s", shortLink)
+				return 0, 0, "", fmt.Errorf("no record found for shortLink: %s", shortLink)
 			}
-			return 0, 0, err
+			return 0, 0, "", err
 		}
 	}
-	return expireTime, transferCounter, nil
+	return expireTime, transferCounter, origlink, nil
 }
 
 func (base *DataBase) DeleteBytime(time int) error {
