@@ -13,10 +13,11 @@ type ResponseCreateLinkBody struct {
 }
 
 type ResponseGetLinks struct {
-	Links []string `json:"links"`
+	Links map[string]string `json:"links"`
 }
 
 type ResponseLinkStatistic struct {
 	ExpireTime    time.Time `json:"expiretime"`
 	TransferCount int       `json:"transferCount"`
+	OrigLink      string    `json:"link"`
 }
