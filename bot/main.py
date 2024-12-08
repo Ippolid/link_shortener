@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import os
 import logging
-from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -27,32 +27,31 @@ START_CHOICES, REPLY_FOR_CREATE, URL_CHOICES, REPLY_FOR_DELETE, \
 REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD, CHANGE_PERIOD_30, \
 URL_EVENTS, DELETE_LINK_YES = range(10)
 
-create_url_btn = 'создать ссылку'
-list_of_urls_btn = "список ссылок"
+create_url_btn = 'создание 🔗'
+list_of_urls_btn = "список"
 
-delete_url_btn = 'удалить ссылку'
+delete_url_btn = 'удаление'
 change_url_btn = 'изменить срок действия'
 to_main_page_btn = 'на главную'
 
-urls_markups_keyboard = [
-    [delete_url_btn],
-    [change_url_btn],
-    [to_main_page_btn],
+to_main_page_button = [
+    [
+        InlineKeyboardButton(text=to_main_page_btn, callback_data=str(URL_CHOICES)),
+    ]
 ]
-urls_markups = ReplyKeyboardMarkup(urls_markups_keyboard, one_time_keyboard=True)
+keyboard_to_main_page = InlineKeyboardMarkup(to_main_page_button)
 
-start_buttons = [
+create_button = [
     [
         InlineKeyboardButton(text=create_url_btn, callback_data=str(REPLY_FOR_CREATE)),
-        InlineKeyboardButton(text=list_of_urls_btn, callback_data=str(URL_CHOICES)),
     ],
 ]
-start_keyboard = InlineKeyboardMarkup(start_buttons)
+create_keyboard = InlineKeyboardMarkup(create_button)
 
 urls_buttons = [
     [
         InlineKeyboardButton(text=delete_url_btn, callback_data=str(REPLY_FOR_DELETE)),
-        InlineKeyboardButton(text=to_main_page_btn, callback_data=str(START_CHOICES)),
+        InlineKeyboardButton(text=to_main_page_btn, callback_data=str(URL_CHOICES)),
     ],
     [
         InlineKeyboardButton(text=change_url_btn, callback_data=str(REPLY_FOR_CHANGE)),
@@ -60,6 +59,14 @@ urls_buttons = [
     ]
 ]
 urls_keyboard = InlineKeyboardMarkup(urls_buttons)
+
+
+def return_to_main_page_after_error(update, msg):
+    update.callback_query.edit_message_text(
+        f"{msg}, попробуйте позже",
+        reply_markup=keyboard_to_main_page,
+    )
+    return URL_CHOICES
 
 
 def get_month_name(month_no, ):
@@ -73,47 +80,6 @@ def date_to_rus_with_month(date: datetime.date):
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Уважаемый пользователь, Вас приветствует бот по созданию коротких ссылок! Выберите один из вариантов",
-        reply_markup=start_keyboard,
-    )
-    return START_CHOICES
-
-
-async def create_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.effective_message.edit_text(
-        "Введите свою ссылку",
-    )
-    return REPLY_FOR_CREATE
-
-
-async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.effective_user.id
-
-    response = httpx.post(
-        f"{BASE_URL}/url",
-        json={
-            "oldurl": update.message.text,
-            "userid": str(user_id),
-        }
-    )
-    if response.status_code != 200:
-        await update.message.reply_text(
-            f"Не удалось создать ссылку. Подробности {response.text}",
-            reply_markup=start_keyboard,
-        )
-        return START_CHOICES
-
-    short_url = response.json()["shorturl"]
-    await update.message.reply_markdown(
-        f"Ваша ссылка ```{short_url}```",
-        reply_markup=start_keyboard,
-    )
-
-    return START_CHOICES
-
-
-async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     try:
         response = httpx.get(
@@ -121,49 +87,129 @@ async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         )
         response.raise_for_status()
     except Exception as ex:
-        await update.callback_query.edit_message_text(
-            f"Не удалось получить список ссылок. Подробности {ex}",
-            reply_markup=start_keyboard,
-        )
-        return START_CHOICES
+        return return_to_main_page_after_error(update, "Не удалось получить список ссылок")
 
     urls = response.json()["links"]
     if urls.keys():
         button_list = []
         for url_short, url_long in urls.items():
             button_list.append(InlineKeyboardButton(url_long, callback_data=f"url_is_{url_short}"))
-        urls_keyboard_dynamic = InlineKeyboardMarkup(
-            [button_list[i:i + 1] for i in range(0, len(button_list), 1)]
-        )
+        dynamic_buttons = [button_list[i:i + 1] for i in range(0, len(button_list), 1)]
+        dynamic_buttons.append(create_button[0])
+        urls_keyboard_dynamic = InlineKeyboardMarkup(dynamic_buttons)
 
-        await update.callback_query.edit_message_text(
-            f"Ваши ссылки",
+        await update.message.reply_text(
+            f"Ваши ссылки:",
             reply_markup=urls_keyboard_dynamic,
         )
         return URL_CHOICES
 
     else:
-        await update.effective_message.edit_text(
-            "Ничего не найдено. Попробуйте ввести свою первую ссылку ниже:",
+        await update.message.reply_text(
+            "Уважаемый пользователь, Вас приветствует бот по созданию коротких ссылок!",
+            reply_markup=create_keyboard,
         )
-        return REPLY_FOR_CREATE
+        return START_CHOICES
+
+
+async def create_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.effective_message.edit_text(
+        "Введите свою ссылку:",
+    )
+    return REPLY_FOR_CREATE
+
+
+async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    old_url = update.message.text
+
+    response = None
+    try:
+        response = httpx.get(old_url)
+        response.raise_for_status()
+    except Exception as ex:
+        if response and response.status_code == 301:
+            await update.message.reply_markdown(
+                f"Вы ввели ссылку, которая не является конечной.\n"
+                f"Попробуйте вставить эту ссылку в браузер и записать здесь новый результат после её загрузки\n",
+                reply_markup=keyboard_to_main_page,
+            )
+            return REPLY_FOR_CREATE
+        else:
+            await update.message.reply_markdown(
+                f"Вы ввели нерабочую ссылку.\n"
+                f"Обратите внимание, что ссылка должна начинаться с `https://` или `http://`\n",
+                reply_markup=keyboard_to_main_page,
+            )
+            return REPLY_FOR_CREATE
+
+    try:
+        response = httpx.post(
+            f"{BASE_URL}/url",
+            json={
+                "oldurl": old_url,
+                "userid": str(user_id),
+            }
+        )
+        response.raise_for_status()
+    except Exception as ex:
+        await return_to_main_page_after_error(update, "Не удалось создать ссылку")
+
+    short_url = response.json()["shorturl"]
+    await update.message.reply_markdown(
+        f"Ваша ссылка ```{short_url}```",
+        reply_markup=keyboard_to_main_page,
+    )
+
+    return START_CHOICES
+
+
+async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
+    response = None
+    try:
+        response = httpx.get(
+            f"{BASE_URL}/statistic/{user_id}"
+        )
+        response.raise_for_status()
+    except Exception as ex:
+        await return_to_main_page_after_error(update, "Не удалось получить список ссылок")
+
+    urls = response.json()["links"]
+    if urls.keys():
+        button_list = []
+        for url_short, url_long in urls.items():
+            button_list.append(InlineKeyboardButton(url_long, callback_data=f"url_is_{url_short}"))
+        dynamic_buttons = [button_list[i:i + 1] for i in range(0, len(button_list), 1)]
+        dynamic_buttons.append(create_button[0])
+        urls_keyboard_dynamic = InlineKeyboardMarkup(dynamic_buttons)
+
+        await update.callback_query.edit_message_text(
+            f"Ваши ссылки",
+            reply_markup=urls_keyboard_dynamic,
+        )
+
+    else:
+        await update.effective_message.edit_text(
+            "На данный момент у Вас нет активных ссылок",
+            reply_markup=create_keyboard,
+        )
+
+    return URL_CHOICES
 
 
 async def url_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     url_id = update.callback_query.data[7:]
     user_id = update.effective_user.id
-    user_id = 1264944693
+
+    response = None
     try:
         response = httpx.get(
             f"{BASE_URL}/statistic/{user_id}/{url_id}"
         )
         response.raise_for_status()
     except Exception as ex:
-        await update.message.reply_text(
-            f"Не удалось получить информацию по ссылке. Подробности {ex}",
-            reply_markup=start_keyboard,
-        )
-        return START_CHOICES
+        await return_to_main_page_after_error(update, "Не удалось получить информацию по ссылке")
 
     url_info = response.json()
     short_url = f"{BASE_URL}/{url_id}"
@@ -197,7 +243,6 @@ async def url_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "expire_time": expire_time,
         "transfer_count": transfer_count
     }
-
     return URL_EVENTS
 
 
@@ -206,7 +251,7 @@ async def delete_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     buttons = [
         [
             InlineKeyboardButton(text="Да", callback_data=str(DELETE_LINK_YES)),
-            InlineKeyboardButton(text="Нет", callback_data=str(START_CHOICES)),
+            InlineKeyboardButton(text="Нет", callback_data=str(URL_CHOICES)),
         ]
     ]
     keyboard = InlineKeyboardMarkup(buttons)
@@ -216,31 +261,24 @@ async def delete_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         f"{current_long_link}",
         reply_markup=keyboard,
     )
-
     return REPLY_FOR_DELETE
 
 
 async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     current_link_id = context.user_data["link"]['short_link_id']
     user_id = update.effective_user.id
-    user_id = 1264944693
     try:
         response = httpx.delete(
             f"{BASE_URL}/{user_id}/delete/{current_link_id}",
         )
         response.raise_for_status()
     except Exception as ex:
-        await update.message.reply_text(
-            f"Не удалось удалить ссылку. Подробности: {ex}",
-            reply_markup=start_keyboard,
-        )
-        return START_CHOICES
+        await return_to_main_page_after_error(update, "Не удалось удалить ссылку, попробуйте позже")
 
     await update.callback_query.edit_message_text(
         f"Ссылка успешно удалена\n",
-        reply_markup=start_keyboard,
+        reply_markup=keyboard_to_main_page,
     )
-
     return START_CHOICES
 
 
@@ -248,22 +286,21 @@ async def change_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.callback_query.edit_message_text(
         'Введите новый срок действия в часах',
     )
-
     return REPLY_FOR_CHANGE_PERIOD
 
 
 async def change_url_period_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
+        assert update.message.text.isdigit()
         expire_delta = int(update.message.text)
     except Exception as ex:
         await update.message.reply_text(
-            f"Не удалось обработать данные. Введите, пожалуйста, число:",
+            f"Не удалось обработать данные. Срок действия должен быть целым числом и больше 0",
         )
         return REPLY_FOR_CHANGE
 
     current_link_id = context.user_data["link"]['short_link_id']
     user_id = update.effective_user.id
-    user_id = 1264944693
 
     try:
         response = httpx.put(
@@ -271,20 +308,15 @@ async def change_url_period_get(update: Update, context: ContextTypes.DEFAULT_TY
         )
         response.raise_for_status()
     except Exception as ex:
-        await update.message.reply_text(
-            f"Не удалось продлить срок действия. Подробности: {ex}",
-            reply_markup=start_keyboard,
-        )
-        return START_CHOICES
+        await return_to_main_page_after_error(update, "Не удалось продлить срок действия")
 
     new_expire_time = datetime.now() + timedelta(hours=expire_delta)
     expire_time_ru = f"{new_expire_time.day} {get_month_name(new_expire_time.month)} {new_expire_time.year} {new_expire_time.hour}:{new_expire_time.minute}"
 
     await update.message.reply_text(
         f"Срок действия ссылки установлен до {expire_time_ru}",
-        reply_markup=start_keyboard,
+        reply_markup=keyboard_to_main_page,
     )
-
     return START_CHOICES
 
 
@@ -292,7 +324,6 @@ async def change_url_period_30(update: Update, context: ContextTypes.DEFAULT_TYP
     expire_delta_to_add = 30 * 24
     current_link_id = context.user_data["link"]['short_link_id']
     user_id = update.effective_user.id
-    user_id = 1264944693
     try:
         expire_delta = (context.user_data["link"]['expire_time'] - datetime.now()).days * 24
         response = httpx.put(
@@ -300,27 +331,14 @@ async def change_url_period_30(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         response.raise_for_status()
     except Exception as ex:
-        await update.message.reply_text(
-            f"Не удалось продлить срок действия. Подробности: {ex}",
-            reply_markup=start_keyboard,
-        )
-        return START_CHOICES
+        await return_to_main_page_after_error(update, "Не удалось продлить срок действия")
 
     new_expire_time = datetime.now() + timedelta(hours=expire_delta + expire_delta_to_add)
     expire_time_ru = f"{new_expire_time.day} {get_month_name(new_expire_time.month)} {new_expire_time.year}"
 
     await update.callback_query.edit_message_text(
         f"Срок действия ссылки установлен до {expire_time_ru}",
-        reply_markup=start_keyboard,
-    )
-
-    return START_CHOICES
-
-
-async def to_main_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.callback_query.edit_message_text(
-        'Выберите один из вариантов',
-        reply_markup=start_keyboard,
+        reply_markup=keyboard_to_main_page,
     )
     return START_CHOICES
 
@@ -333,7 +351,7 @@ def main() -> None:
         states={
             START_CHOICES: [
                 CallbackQueryHandler(create_url_ask, pattern="^" + str(REPLY_FOR_CREATE) + "$"),
-                CallbackQueryHandler(list_of_urls, pattern="^" + str(URL_CHOICES) + "$"),
+                CallbackQueryHandler(url_edit, pattern="^url_is"),
             ],
             REPLY_FOR_CREATE: [
                 MessageHandler(
@@ -343,6 +361,7 @@ def main() -> None:
             ],
             URL_CHOICES: [
                 CallbackQueryHandler(url_edit, pattern="^url_is"),
+                CallbackQueryHandler(create_url_ask, pattern="^" + str(REPLY_FOR_CREATE) + "$"),
             ],
             URL_EVENTS: [
                 CallbackQueryHandler(delete_url_ask, pattern="^" + str(REPLY_FOR_DELETE) + "$"),
@@ -360,7 +379,7 @@ def main() -> None:
                 ),
             ],
         },
-        fallbacks=[CallbackQueryHandler(to_main_page, pattern="^" + str(START_CHOICES) + "$")]
+        fallbacks=[CallbackQueryHandler(list_of_urls, pattern="^" + str(URL_CHOICES) + "$")]
     )
 
     application.add_handler(conv_handler)
