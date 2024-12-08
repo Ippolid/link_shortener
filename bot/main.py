@@ -22,7 +22,8 @@ TOKEN = os.getenv('TOKEN')
 BASE_URL = os.getenv('BASE_URL')
 
 START_CHOICES, REPLY_FOR_CREATE, URL_CHOICES, REPLY_FOR_DELETE, \
-REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD, URL_EVENTS = range(8)
+REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD, \
+URL_EVENTS, DELETE_LINK_YES = range(9)
 
 create_url_btn = 'создать ссылку'
 list_of_urls_btn = "список ссылок"
@@ -104,7 +105,7 @@ async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         )
         response.raise_for_status()
     except Exception as ex:
-        await update.message.reply_text(
+        await update.callback_query.edit_message_text(
             f"Не удалось получить список ссылок. Подробности {ex}",
             reply_markup=start_keyboard,
         )
@@ -133,40 +134,77 @@ async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return URL_CHOICES
 
 
+async def url_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    url_id = update.callback_query.data[8:]
+    user_id = update.effective_user.id
+    try:
+        response = httpx.get(
+            f"{BASE_URL}/statistic/{user_id}/{url_id}"
+        )
+    except Exception as ex:
+        await update.message.reply_text(
+            f"Не удалось получить информацию по ссылке. Подробности {ex}",
+            reply_markup=start_keyboard,
+        )
+        return START_CHOICES
+
+    url_info = response.json()
+
+    await update.callback_query.edit_message_text(
+        f"Длинная ссылка:\n "
+        f"{url_info}\n"
+        f"Короткая ссылка:\n"
+        f"{url_info}",
+        reply_markup=urls_keyboard,
+    )
+    context.user_data["link"] = {
+        "short_link": url_info,
+        "long_link": url_info,
+        "date_expired": url_info
+    }
+
+    return URL_EVENTS
+
+
 async def delete_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.effective_message.edit_text(f"введите номер ссылки, которую удалить")
+    current_link = context.user_data["link"]
+    buttons = [
+        [
+            InlineKeyboardButton(text="Да", callback_data=str(DELETE_LINK_YES)),
+            InlineKeyboardButton(text="Нет", callback_data=str(START_CHOICES)),
+        ]
+    ]
+    keyboard = InlineKeyboardMarkup(buttons)
+
+    await update.callback_query.edit_message_text(
+        f"Вы уверены, что хотите удалить ссылку?\n "
+        f"Длинная ссылка:\n "
+        f"{current_link}\n"
+        f"Короткая ссылка:\n"
+        f"{current_link}",
+        reply_markup=keyboard,
+    )
 
     return REPLY_FOR_DELETE
 
 
-async def delete_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    text = update.message.text
-    user_data = context.user_data
-    user_data['urls'].pop(int(text) - 1)
-    print(user_data['urls'])
-    response = '200_OK'
+async def delete_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    current_link = context.user_data["link"]
+    response = httpx.delete()
 
-    urls = user_data['urls']
-    urls_str = ''
-    for i in range(len(urls)):
-        urls_str += f"\n{i + 1} {urls[i]}"
-
-    await update.message.reply_text(
-        f"Удаление ссылки: {response}\n"
-        f"Список ссылок {urls_str}",
-        reply_markup=urls_keyboard,
+    await update.callback_query.edit_message_text(
+        f"Ссылка успешно удалена\n "
+        f"Длинная ссылка:\n "
+        f"{current_link}\n"
+        f"Короткая ссылка:\n"
+        f"{current_link}",
+        reply_markup=start_keyboard,
     )
 
-    return URL_CHOICES
+    return START_CHOICES
 
 
-async def change_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    await update.effective_message.edit_text(f"Введите номер ссылки, срок действия которой хотите изменить")
-
-    return REPLY_FOR_CHANGE
-
-
-async def change_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def change_url(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     response = ['http', '30 дней']
     await update.message.reply_text(
         f"ваша ссылка {response[0]}, срок действия {response[1]}"
@@ -205,33 +243,6 @@ async def to_main_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return START_CHOICES
 
 
-async def url_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    url_id = update.callback_query.data[8:]
-    user_id = update.effective_user.id
-    try:
-        response = httpx.get(
-            f"{BASE_URL}/statistic/{user_id}/{url_id}"
-        )
-    except Exception as ex:
-        await update.message.reply_text(
-            f"Не удалось получить информацию по ссылке. Подробности {ex}",
-            reply_markup=start_keyboard,
-        )
-        return START_CHOICES
-
-    url_info = response.json()
-
-    await update.callback_query.edit_message_text(
-        f"Длинная ссылка:\n "
-        f"{url_info}\n"
-        f"Короткая ссылка:\n"
-        f"{url_info}",
-        reply_markup=urls_keyboard,
-    )
-
-    return URL_EVENTS
-
-
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
 
@@ -253,19 +264,11 @@ def main() -> None:
             ],
             URL_EVENTS: [
                 CallbackQueryHandler(delete_url_ask, pattern="^" + str(REPLY_FOR_DELETE) + "$"),
-                CallbackQueryHandler(change_url_ask, pattern="^" + str(REPLY_FOR_CHANGE) + "$"),
+                CallbackQueryHandler(change_url, pattern="^" + str(REPLY_FOR_CHANGE) + "$"),
             ],
             REPLY_FOR_DELETE: [
-                MessageHandler(
-                    filters.TEXT & ~(filters.COMMAND | filters.Regex(f"^({to_main_page_btn})$")),
-                    delete_url_get,
-                ),
-            ],
-            REPLY_FOR_CHANGE: [
-                MessageHandler(
-                    filters.TEXT & ~(filters.COMMAND | filters.Regex(f"^({to_main_page_btn})$")),
-                    change_url_get,
-                ),
+                CallbackQueryHandler(delete_url, pattern="^" + str(REPLY_FOR_DELETE) + "$"),
+                CallbackQueryHandler(delete_url, pattern="^" + str(START_CHOICES) + "$"),
             ],
             REPLY_FOR_CHANGE_PERIOD: [
                 MessageHandler(
