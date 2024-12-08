@@ -19,6 +19,8 @@ logging.basicConfig(
     level=logging.INFO
 )
 TOKEN = os.getenv('TOKEN')
+BASE_URL = os.getenv('BASE_URL')
+
 START_CHOICES, REPLY_FOR_CREATE, URL_CHOICES, REPLY_FOR_DELETE, \
 REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD, URL_EVENTS = range(8)
 
@@ -59,8 +61,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Уважаемый пользователь, Вас приветствует бот по созданию коротких ссылок! Выберите один из вариантов",
         reply_markup=start_keyboard,
     )
-    print(update.effective_user.id)
-
     return START_CHOICES
 
 
@@ -74,7 +74,7 @@ async def create_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     response = httpx.post(
-        f"http://team5.itatmisis.ru/url",
+        f"{BASE_URL}/url",
         json={
             "oldurl": update.message.text,
             "userid": str(user_id),
@@ -97,17 +97,23 @@ async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    # user_id = 89898
-    # response = httpx.get(
-    #     f"http://team5.itatmisis.ru/statistic/{user_id}"
-    # )
-    response = [
-        {"url": "https://sdfsd", "stat": 12, "expired": 20},
-        {"url": "https://tweter", "stat": 10, "expired": 5}
-    ]
+    user_id = update.effective_user.id
+    try:
+        response = httpx.get(
+            f"{BASE_URL}/statistic/{user_id}"
+        )
+        response.raise_for_status()
+    except Exception as ex:
+        await update.message.reply_text(
+            f"Не удалось получить список ссылок. Подробности {ex}",
+            reply_markup=start_keyboard,
+        )
+        return START_CHOICES
+
+    urls = response.json()["links"]
+
     button_list = []
-    for each in response:
-        url = each["url"]
+    for url in urls:
         button_list.append(InlineKeyboardButton(url, callback_data=f"url_is_{url}"))
     urls_keyboard_dynamic = InlineKeyboardMarkup(
         [button_list[i:i + 1] for i in range(0, len(button_list), 1)]
@@ -115,7 +121,7 @@ async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     user_data = context.user_data
     if not user_data.get('urls'):
-        user_data['urls'] = response
+        user_data['urls'] = urls
     urls = user_data['urls']
     urls_str = ''
     for i in range(len(urls)):
@@ -200,9 +206,26 @@ async def to_main_page(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 
 async def url_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
+    url_id = update.callback_query.data[8:]
+    user_id = update.effective_user.id
+    try:
+        response = httpx.get(
+            f"{BASE_URL}/statistic/{user_id}/{url_id}"
+        )
+    except Exception as ex:
+        await update.message.reply_text(
+            f"Не удалось получить информацию по ссылке. Подробности {ex}",
+            reply_markup=start_keyboard,
+        )
+        return START_CHOICES
+
+    url_info = response.json()
+
     await update.callback_query.edit_message_text(
-        f"Ваша ссылка {query.data}",
+        f"Длинная ссылка:\n "
+        f"{url_info}\n"
+        f"Короткая ссылка:\n"
+        f"{url_info}",
         reply_markup=urls_keyboard,
     )
 
