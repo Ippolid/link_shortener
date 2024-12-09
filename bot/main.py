@@ -88,16 +88,6 @@ async def return_to_main_page_after_error(update, msg, new=False):
     return URL_CHOICES
 
 
-def get_month_name(month_no):
-    with calendar.different_locale("ru_RU.UTF-8"):
-        month_name = calendar.month_name[month_no]
-        return month_name
-
-
-def date_to_rus_with_month(date):
-    return f"{date.day} {get_month_name(date.month)} {date.year}"
-
-
 def days_name_ru(number):
     if number == 1:
         return "день"
@@ -150,25 +140,16 @@ async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_id = update.effective_user.id
     old_url = update.message.text
 
-    response = None
     try:
         response = httpx.get(old_url)
-        response.raise_for_status()
+        assert str(response.status_code) not in ['404'] or str(response.status_code)[0] not in ['5']
     except Exception as ex:
-        if response and response.status_code in [301, 302]:
-            await update.message.reply_markdown(
-                f"Вы ввели ссылку, которая не является конечной 🤔.\n"
-                f"Попробуйте вставить эту ссылку в браузер и записать здесь новый результат после её загрузки\n",
-                reply_markup=keyboard_to_main_page,
-            )
-            return REPLY_FOR_CREATE
-        else:
-            await update.message.reply_markdown(
-                f"Вы ввели нерабочую ссылку 🤔.\n"
-                f"Обратите внимание, что ссылка должна начинаться с `https://` или `http://`\n",
-                reply_markup=keyboard_to_main_page,
-            )
-            return REPLY_FOR_CREATE
+        await update.message.reply_markdown(
+            f"Похоже, что ссылка невалидна 🤔.\n"
+            f"Обратите внимание, что ссылка должна начинаться с `https://` или `http://`\n",
+            reply_markup=keyboard_to_main_page,
+        )
+        return REPLY_FOR_CREATE
 
     try:
         response = httpx.post(
@@ -193,6 +174,7 @@ async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["link"] = {}
+
     user_id = update.effective_user.id
 
     response = None
@@ -246,7 +228,12 @@ async def url_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     transfer_count = url_info['transferCount']
 
     expire_time = datetime.strptime(url_info['expiretime'], '%Y-%m-%dT%H:%M:%SZ')
-    expire_time_ru = f"{expire_time.day} {get_month_name(expire_time.month)} {expire_time.year} {expire_time.hour}:{expire_time.minute}"
+    get_month_name = ['Января', 'Февраля', 'Марта', 'Апреля', 'Мая', 'Июня', 'Июля', 'Августа', 'Сентября', 'Октября',
+                      'Ноября', 'Декабря']
+    minute = str(expire_time.minute)
+    if int(minute) < 10:
+        minute = '0' + minute
+    expire_time_ru = f"{expire_time.day} {get_month_name[expire_time.month - 1]} {expire_time.year} {expire_time.hour}:{minute}"
     expire_time_delta = (expire_time - datetime.now()).days
     if expire_time_delta == 0:
         expire_info = f"❗Срок действия истекает меньше чем через сутки ({expire_time_ru})."
@@ -336,7 +323,6 @@ async def change_url_period_get(update: Update, context: ContextTypes.DEFAULT_TY
 
     current_link_id = context.user_data["link"]['short_link_id']
     user_id = update.effective_user.id
-
     try:
         response = httpx.put(
             f"{BASE_URL}/{user_id}/change/{current_link_id}/{expire_delta}",
@@ -346,7 +332,12 @@ async def change_url_period_get(update: Update, context: ContextTypes.DEFAULT_TY
         return await return_to_main_page_after_error(update, "Не удалось продлить срок действия")
 
     new_expire_time = datetime.now() + timedelta(hours=expire_delta)
-    expire_time_ru = f"{new_expire_time.day} {get_month_name(new_expire_time.month)} {new_expire_time.year} {new_expire_time.hour}:{new_expire_time.minute}"
+    get_month_name = ['Января', 'Февраля', 'Марта', 'Апреля', 'Мая', 'Июня', 'Июля', 'Августа', 'Сентября', 'Октября',
+                      'Ноября', 'Декабря']
+    new_minute = str(new_expire_time.minute)
+    if int(new_minute) < 10:
+        new_minute = '0' + new_minute
+    expire_time_ru = f"{new_expire_time.day} {get_month_name[new_expire_time.month - 1]} {new_expire_time.year} {new_expire_time.hour}:{new_minute}"
 
     await update.message.reply_text(
         f"Срок действия ссылки установлен до {expire_time_ru}",
@@ -359,7 +350,6 @@ async def change_url_period_30(update: Update, context: ContextTypes.DEFAULT_TYP
     expire_delta_to_add = 30 * 24
     current_link_id = context.user_data["link"]['short_link_id']
     user_id = update.effective_user.id
-
     try:
         expire_delta = (context.user_data["link"]['expire_time'] - datetime.now()).days * 24
         response = httpx.put(
@@ -370,8 +360,12 @@ async def change_url_period_30(update: Update, context: ContextTypes.DEFAULT_TYP
         return await return_to_main_page_after_error(update, "Не удалось продлить срок действия")
 
     new_expire_time = datetime.now() + timedelta(hours=expire_delta + expire_delta_to_add)
-    expire_time_ru = f"{new_expire_time.day} {get_month_name(new_expire_time.month)} {new_expire_time.year}"
-
+    get_month_name = ['Января', 'Февраля', 'Марта', 'Апреля', 'Мая', 'Июня', 'Июля', 'Августа', 'Сентября', 'Октября',
+                      'Ноября', 'Декабря']
+    new_minute = str(new_expire_time.minute)
+    if int(new_minute) < 10:
+        new_minute = '0' + new_minute
+    expire_time_ru = f"{new_expire_time.day} {get_month_name[new_expire_time.month - 1]} {new_expire_time.year} {new_expire_time.hour}:{new_minute}"
     await update.callback_query.edit_message_text(
         f"Срок действия ссылки установлен до {expire_time_ru}",
         reply_markup=keyboard_to_main_page,
