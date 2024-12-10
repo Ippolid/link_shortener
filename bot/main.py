@@ -1,3 +1,9 @@
+# pip install "qrcode[pil]"
+# pip install python-dotenv
+# pip install httpx
+# pip install python-telegram-bot
+
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 import os
 from io import BytesIO
@@ -12,7 +18,7 @@ from telegram.ext import (
     MessageHandler,
     filters, CallbackQueryHandler,
 )
-import calendar
+
 from datetime import datetime, timedelta
 import httpx
 
@@ -110,6 +116,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if urls.keys():
         button_list = []
         for url_short, url_long in urls.items():
+            if 'https://' in url_long:
+                url_long = url_long[8:38]
+            elif 'http://' in url_long:
+                url_long = url_long[7:37]
             button_list.append(InlineKeyboardButton(url_long, callback_data=f"url_is_{url_short}"))
         dynamic_buttons = [button_list[i:i + 1] for i in range(0, len(button_list), 1)]
         dynamic_buttons.append(create_button[0])
@@ -139,17 +149,27 @@ async def create_url_ask(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
     old_url = update.message.text
-
     try:
-        response = httpx.get(old_url)
-        assert str(response.status_code) not in ['404'] or str(response.status_code)[0] not in ['5']
+        result = urlparse(old_url)
+        check_domen = '.' in result.netloc
+        if not all([result.scheme, result.netloc, check_domen]):
+            raise
     except Exception as ex:
-        await update.message.reply_markdown(
-            f"Похоже, что ссылка невалидна 🤔.\n"
-            f"Обратите внимание, что ссылка должна начинаться с `https://` или `http://`\n",
-            reply_markup=keyboard_to_main_page,
-        )
-        return REPLY_FOR_CREATE
+        if not result.scheme:
+            await update.message.reply_markdown(
+                f"Похоже, что ссылка введена неверно 🤔.\n"
+                f"Обратите внимание, что ссылка должна начинаться с `https://` или `http://`\n",
+                reply_markup=keyboard_to_main_page,
+            )
+            return REPLY_FOR_CREATE
+        elif not result.netloc or not x:
+            await update.message.reply_markdown(
+                f"Похоже, что доменная часть ссылки введена неверно 🤔.\n"
+                f"Убедитесь, что ваша ссылка соответствует шаблону:\n"
+                f"http(s)://domen.ru\n",
+                reply_markup=keyboard_to_main_page,
+            )
+            return REPLY_FOR_CREATE
 
     try:
         response = httpx.post(
@@ -190,6 +210,10 @@ async def list_of_urls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     if urls.keys():
         button_list = []
         for url_short, url_long in urls.items():
+            if 'https://' in url_long:
+                url_long = url_long[8:38]
+            elif 'http://' in url_long:
+                url_long = url_long[7:37]
             button_list.append(InlineKeyboardButton(url_long, callback_data=f"url_is_{url_short}"))
         dynamic_buttons = [button_list[i:i + 1] for i in range(0, len(button_list), 1)]
         dynamic_buttons.append(create_button[0])
