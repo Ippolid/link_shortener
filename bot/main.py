@@ -184,8 +184,8 @@ async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return await return_to_main_page_after_error(update, "Не удалось создать ссылку")
 
     short_url = response.json()["shorturl"]
-    await update.message.reply_markdown(
-        f"Ваша ссылка: ```{short_url}```",
+    await update.message.reply_text(
+        f"Ваша ссылка: {short_url}",
         reply_markup=keyboard_to_main_page,
     )
 
