@@ -162,7 +162,7 @@ async def create_url_get(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 reply_markup=keyboard_to_main_page,
             )
             return REPLY_FOR_CREATE
-        elif not result.netloc or not x:
+        elif not result.netloc or not check_domen:
             await update.message.reply_markdown(
                 f"Похоже, что доменная часть ссылки введена неверно 🤔.\n"
                 f"Убедитесь, что ваша ссылка соответствует шаблону:\n"
