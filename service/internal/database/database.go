@@ -28,8 +28,7 @@ const (
 		oldLink text NOT NULL,
 		shortLink text NOT NULL UNIQUE,
 		expireTime integer NOT NULL,
-		transfercounter integer NOT NULL
-	)`
+		transfercounter integer NOT NULL);`
 
 	queryInsertLink = `
 		INSERT INTO links (userId, oldLink, shortLink, expireTime,transfercounter)

@@ -137,16 +137,3 @@ func (s *Server) GetLinkStatistic(ctx *gin.Context) {
 		OrigLink:      origlink,
 	})
 }
-
-// func (s *Server) handlerGet(ctx *gin.Context) {
-// 	key := ctx.Param("key")
-
-// 	v := s.storage.Get(key)
-// 	if v == nil {
-// 		ctx.AbortWithStatus(http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	ctx.JSON(http.StatusOK, Entry{Value: *v})
-
-// }

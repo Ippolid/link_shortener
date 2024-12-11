@@ -25,6 +25,7 @@ logging.basicConfig(
 )
 TOKEN = os.getenv('TOKEN')
 BASE_URL = os.getenv('BASE_URL')
+DOMEN=os.getenv('DOMEN')
 
 START_CHOICES, REPLY_FOR_CREATE, URL_CHOICES, REPLY_FOR_DELETE, \
 REPLY_FOR_CHANGE, ASK_FOR_PERIOD, REPLY_FOR_CHANGE_PERIOD, CHANGE_PERIOD_30, \
@@ -242,7 +243,7 @@ async def url_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await return_to_main_page_after_error(update, "Не удалось получить информацию по ссылке")
 
     url_info = response.json()
-    short_url = f"{BASE_URL}/{url_id}/"
+    short_url = f"{DOMEN}/{url_id}/"
     long_url = url_info['link']
     transfer_count = url_info['transferCount']
 
