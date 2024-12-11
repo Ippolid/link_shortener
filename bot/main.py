@@ -1,8 +1,3 @@
-# pip install "qrcode[pil]"
-# pip install python-dotenv
-# pip install httpx
-# pip install python-telegram-bot
-
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 import os

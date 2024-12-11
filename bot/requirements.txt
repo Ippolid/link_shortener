@@ -1,0 +1,4 @@
+qrcode[pil]
+python-dotenv
+httpx
+python-telegram-bot
