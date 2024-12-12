@@ -1,18 +1,23 @@
-# Используем официальный образ Ubuntu
 FROM ubuntu:22.04
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.yandex.ru/ubuntu|g' /etc/apt/sources.list && \
+   sed -i 's|http://security.ubuntu.com/ubuntu|http://mirror.yandex.ru/ubuntu|g' /etc/apt/sources.list
 
-# Обновляем пакеты и устанавливаем Python3 и pip
+
 RUN apt-get update && apt-get install -y python3 python3-pip && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем рабочую директорию
+
 WORKDIR /app
 
-# Копируем ваш Python-скрипт внутрь контейнера
+
 COPY ../bot /app
 
-# При необходимости устанавливаем зависимости из requirements.txt (если они есть)
+
 COPY ../deploy/requirements.txt /app
+
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Запускаем скрипт при старте контейнера
 CMD ["python3", "main.py"]
+
+
+
+
