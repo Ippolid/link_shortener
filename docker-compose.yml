@@ -1,4 +1,4 @@
-services:
+ervices:
   postgres:
     image: postgres:16.6
     environment:
@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "1234"
     ports:
-        - "5433:5432" 
+        - "127.0.0.1:5432:5432" 
     volumes:
         - postgres:/var/lib/postgresql/data
 
@@ -24,13 +24,14 @@ services:
       - '80:8090'
     
   bot:
-    image: python:3.11-slim
+    image: python:3.10
     depends_on:
       - "core"
       - "postgres"
     build:
         dockerfile: ./deploy/DockerfilePython
         context: .
+        network: host
     env_file:
       - dev.env
     command: ["python3", "main.py"]
